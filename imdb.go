@@ -59,7 +59,7 @@ func displayMovies(movies []Movie) {
 		}
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 10, 1, 2,' ', 0)
+	w := tabwriter.NewWriter(os.Stdout, 10, 1, 2, ' ', 0)
 	titleColor := color.New(color.FgCyan).SprintFunc()
 	yearColor := color.New(color.FgGreen).SprintFunc()
 	linkColor := color.New(color.FgYellow).SprintFunc()
