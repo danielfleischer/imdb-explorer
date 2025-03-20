@@ -23,6 +23,8 @@ type Movie struct {
 }
 
 func main() {
+	var year string
+
 	var rootCmd = &cobra.Command{
 		Use:   "imdb [movie title]",
 		Short: "CLI app to search movies on OMDB",
@@ -34,7 +36,7 @@ func main() {
 				return
 			}
 
-			movies, err := searchOMDB(title)
+			movies, err := searchOMDB(title, year)
 			if err != nil {
 				fmt.Println("Error:", err)
 				return
@@ -43,6 +45,8 @@ func main() {
 			displayMovies(movies)
 		},
 	}
+
+	rootCmd.Flags().StringVarP(&year, "year", "y", "", "Year of release")
 
 	rootCmd.Execute()
 }
@@ -80,8 +84,8 @@ func openBrowser(imdbID string) {
 	}
 }
 
-func searchOMDB(title string) ([]Movie, error) {
-	url := fmt.Sprintf("http://www.omdbapi.com/?s=%s&apikey=%s", title, apiKey)
+func searchOMDB(title, year string) ([]Movie, error) {
+	url := fmt.Sprintf("http://www.omdbapi.com/?s=%s&y=%s&apikey=%s", title, year, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
