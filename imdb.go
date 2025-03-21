@@ -7,10 +7,12 @@ import (
 	// "os"
 	"os"
 	"os/exec"
-	"text/tabwriter"
+	// "text/tabwriter"
 
-	"github.com/fatih/color"
+	// "github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
@@ -20,6 +22,38 @@ type Movie struct {
 	Year   string `json:"Year"`
 	IMDBID string `json:"imdbID"`
 	Type   string `json:"Type"`
+}
+
+type model struct {
+    table table.Model
+}
+
+func (m model) Init() tea.Cmd {
+    return nil
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        switch msg.String() {
+        case "ctrl+c", "q":
+            return m, tea.Quit
+        case "up":
+            m.table.MoveUp(1)
+        case "down":
+            m.table.MoveDown(1)
+        case "enter":
+            selectedRow := m.table.SelectedRow()
+            link := selectedRow[3]
+            openBrowser(link)
+        }
+    }
+    return m, nil
+}
+
+
+func (m model) View() string {
+    return m.table.View()
 }
 
 func main() {
@@ -52,32 +86,64 @@ func main() {
 }
 
 func displayMovies(movies []Movie) {
-	maxTitleLength := 0
-	for _, movie := range movies {
-		if len(movie.Title) > maxTitleLength {
-			maxTitleLength = len(movie.Title)
-		}
+	// maxTitleLength := 0
+	// for _, movie := range movies {
+	// 	if len(movie.Title) > maxTitleLength {
+	// 		maxTitleLength = len(movie.Title)
+	// 	}
+	// }
+
+	columns := []table.Column{
+		{Title: "Title", Width: 20},
+		{Title: "Year", Width: 10},
+		{Title: "Type", Width: 10},
+		{Title: "Link", Width: 30},
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 10, 1, 2, ' ', 0)
-	titleColor := color.New(color.FgCyan).SprintFunc()
-	yearColor := color.New(color.FgGreen).SprintFunc()
-	linkColor := color.New(color.FgYellow).SprintFunc()
+	// rows := []table.Row{
+	// 	{"1", "The Shawshank Redemption", "1994"},
+	// 	{"2", "The Godfather", "1972"},
+	// 	{"3", "The Dark Knight", "2008"},
+	// }
+
+	var rows []table.Row
+	for _, movie := range movies {
+		rows = append(rows, table.Row{movie.Title, movie.Year, movie.Type, fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)})
+	}
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+	)
+
+	m := model{table: t}
+
+	p := tea.NewProgram(m)
+	if err := p.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v", err)
+		os.Exit(1)
+	}
+
+	// w := tabwriter.NewWriter(os.Stdout, 10, 1, 2, ' ', 0)
+	// titleColor := color.New(color.FgCyan).SprintFunc()
+	// yearColor := color.New(color.FgGreen).SprintFunc()
+	// linkColor := color.New(color.FgYellow).SprintFunc()
 
 	// fmt.Fprintln(w, "Title\tYear\tType\tIMDB_Link")
-	for _, movie := range movies {
-		fmt.Fprintf(w,
-			"%s\t%s\t%s\t%s\n",
-			titleColor(movie.Title),
-			yearColor(movie.Year),
-			movie.Type,
-			linkColor(fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)))
-	}
-	w.Flush()
+	// for _, movie := range movies {
+	// 	fmt.Fprintf(w,
+	// 		"%s\t%s\t%s\t%s\n",
+	// 		titleColor(movie.Title),
+	// 		yearColor(movie.Year),
+	// 		movie.Type,
+	// 		linkColor(fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)))
+	// }
+
+	// w.Flush()
 }
 
-func openBrowser(imdbID string) {
-	url := fmt.Sprintf("https://www.imdb.com/title/%s", imdbID)
+func openBrowser(url string) {
+	// url := fmt.Sprintf("https://www.imdb.com/title/%s", imdbID)
 	err := exec.Command("open", url).Start()
 	if err != nil {
 		fmt.Println("Error opening browser:", err)
