@@ -20,6 +20,7 @@ var (
 	titleColor = color.New(color.FgCyan).SprintFunc()
 	yearColor = color.New(color.FgGreen).SprintFunc()
 	ratingColor = color.New(color.FgHiBlue).SprintFunc()
+	hintColor = color.New(color.FgHiBlack).SprintFunc()
 )
 
 type Program struct {
@@ -173,7 +174,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return m.table.View()
+	return m.table.View() + hintColor("\n\nq: quit, up/down/n/p: move, RET: select")
 }
 
 func main() {
