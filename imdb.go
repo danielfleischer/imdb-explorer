@@ -17,10 +17,10 @@ import (
 var apiKey = os.Getenv("OMDB_API_KEY")
 
 var (
-	titleColor = color.New(color.FgCyan).SprintFunc()
-	yearColor = color.New(color.FgGreen).SprintFunc()
+	titleColor  = color.New(color.FgCyan).SprintFunc()
+	yearColor   = color.New(color.FgGreen).SprintFunc()
 	ratingColor = color.New(color.FgHiBlue).SprintFunc()
-	hintColor = color.New(color.FgHiBlack).SprintFunc()
+	hintColor   = color.New(color.FgHiBlack).SprintFunc()
 )
 
 type Program struct {
@@ -30,7 +30,7 @@ type Program struct {
 	Type    string `json:"Type"`
 	Seasons string `json:"totalSeasons"`
 	Length  string `json:"Runtime"`
-	Rating   string `json:"imdbRating"`
+	Rating  string `json:"imdbRating"`
 }
 
 type Episode struct {
@@ -76,7 +76,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selectedProgram = Program{
 						Title:   selectedRow[0],
 						Year:    selectedRow[1],
-						Rating:   selectedRow[2],
+						Rating:  selectedRow[2],
 						Type:    selectedRow[3],
 						Length:  selectedRow[4],
 						Seasons: selectedRow[5],
@@ -138,7 +138,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				columns := []table.Column{
 					{Title: "Episode", Width: 10},
-					{Title: "Title", Width: 30},
+					{Title: "Title", Width: 38},
 					{Title: "Rating", Width: 12},
 					{Title: "Released", Width: 20},
 					{Title: "Link", Width: 0},
@@ -234,8 +234,6 @@ func displayMovies(movies []Program) {
 		{Title: "Seasons", Width: 10},
 		{Title: "Link", Width: 0},
 	}
-
-	// linkColor := color.New(color.FgYellow).SprintFunc()
 
 	var rows []table.Row
 	for _, item := range movies {
