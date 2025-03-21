@@ -170,7 +170,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return m.table.View()
+	return strings.TrimRight(m.table.View(), "\n")
 }
 
 func main() {
