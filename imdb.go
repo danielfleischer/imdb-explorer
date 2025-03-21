@@ -16,6 +16,12 @@ import (
 
 var apiKey = os.Getenv("OMDB_API_KEY")
 
+var (
+	titleColor = color.New(color.FgCyan).SprintFunc()
+	yearColor = color.New(color.FgGreen).SprintFunc()
+	ratingColor = color.New(color.FgHiBlue).SprintFunc()
+)
+
 type Program struct {
 	Title   string `json:"Title"`
 	Year    string `json:"Year"`
@@ -23,7 +29,7 @@ type Program struct {
 	Type    string `json:"Type"`
 	Seasons string `json:"totalSeasons"`
 	Length  string `json:"Runtime"`
-	Score   string `json:"imdbRating"`
+	Rating   string `json:"imdbRating"`
 }
 
 type Episode struct {
@@ -31,6 +37,7 @@ type Episode struct {
 	Released string `json:"Released"`
 	Episode  string `json:"Episode"`
 	ImdbID   string `json:"imdbID"`
+	Rating   string `json:"imdbRating"`
 }
 
 type EpisodeResponse struct {
@@ -68,7 +75,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selectedProgram = Program{
 						Title:   selectedRow[0],
 						Year:    selectedRow[1],
-						Score:   selectedRow[2],
+						Rating:   selectedRow[2],
 						Type:    selectedRow[3],
 						Length:  selectedRow[4],
 						Seasons: selectedRow[5],
@@ -78,8 +85,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						{Title: "Options", Width: 20},
 					}
 					optionsRows := []table.Row{
-						{"Browse"},
 						{"Find Episode"},
+						{"Browse"},
 					}
 					m.table = table.New(
 						table.WithColumns(columns),
@@ -129,15 +136,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				columns := []table.Column{
 					{Title: "Episode", Width: 10},
 					{Title: "Title", Width: 30},
-					{Title: "Released", Width: 15},
+					{Title: "Rating", Width: 12},
+					{Title: "Released", Width: 20},
 					{Title: "Link", Width: 0},
 				}
 				var episodeRows []table.Row
 				for _, ep := range episodes {
 					episodeRows = append(episodeRows, table.Row{
 						ep.Episode,
-						ep.Title,
-						ep.Released,
+						titleColor(ep.Title),
+						ratingColor(ep.Rating),
+						yearColor(ep.Released),
 						fmt.Sprintf("https://www.imdb.com/title/%s", ep.ImdbID),
 					})
 				}
@@ -150,7 +159,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			} else if m.state == "episodeDisplay" {
 				selectedRow := m.table.SelectedRow()
-				link := string(selectedRow[3])
+				link := string(selectedRow[4])
 				openBrowser(link)
 				return m, tea.Quit
 			}
@@ -192,7 +201,7 @@ func main() {
 				}
 				movies[i].Seasons = info.Seasons
 				movies[i].Length = info.Length
-				movies[i].Score = info.Score
+				movies[i].Rating = info.Rating
 			}
 
 			displayMovies(movies)
@@ -215,15 +224,13 @@ func displayMovies(movies []Program) {
 	columns := []table.Column{
 		{Title: "Title", Width: maxTitleLength + 10},
 		{Title: "Year", Width: 16},
-		{Title: "Score", Width: 6},
+		{Title: "Rating", Width: 12},
 		{Title: "Type", Width: 10},
 		{Title: "Length", Width: 10},
 		{Title: "Seasons", Width: 10},
 		{Title: "Link", Width: 0},
 	}
 
-	titleColor := color.New(color.FgCyan).SprintFunc()
-	yearColor := color.New(color.FgGreen).SprintFunc()
 	// linkColor := color.New(color.FgYellow).SprintFunc()
 
 	var rows []table.Row
@@ -231,7 +238,7 @@ func displayMovies(movies []Program) {
 		rows = append(rows, table.Row{
 			titleColor(item.Title),
 			yearColor(item.Year),
-			item.Score,
+			ratingColor(item.Rating),
 			item.Type,
 			item.Length,
 			item.Seasons,
