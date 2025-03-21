@@ -14,11 +14,14 @@ import (
 
 var apiKey = os.Getenv("OMDB_API_KEY")
 
-type Movie struct {
-	Title  string `json:"Title"`
-	Year   string `json:"Year"`
-	IMDBID string `json:"imdbID"`
-	Type   string `json:"Type"`
+type Program struct {
+	Title   string `json:"Title"`
+	Year    string `json:"Year"`
+	IMDBID  string `json:"imdbID"`
+	Type    string `json:"Type"`
+	Seasons string `json:"totalSeasons"`
+	Length  string `json:"Runtime"`
+	Score   string `json:"imdbRating"`
 }
 
 type model struct {
@@ -35,13 +38,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "up":
+		case "up", "ctrl+p", "p":
 			m.table.MoveUp(1)
-		case "down":
+		case "down", "ctrl+n", "n":
 			m.table.MoveDown(1)
 		case "enter":
 			selectedRow := m.table.SelectedRow()
-			link := string(selectedRow[3])
+			link := string(selectedRow[6])
 			openBrowser(link)
 			return m, tea.Quit
 		}
@@ -73,6 +76,17 @@ func main() {
 				return
 			}
 
+			for i, movie := range movies {
+				info, err := getProgramInfo(movie.IMDBID)
+				if err != nil {
+					fmt.Println("Error:", err)
+					return
+				}
+				movies[i].Seasons = info.Seasons
+				movies[i].Length = info.Length
+				movies[i].Score = info.Score
+			}
+
 			displayMovies(movies)
 		},
 	}
@@ -82,7 +96,7 @@ func main() {
 	rootCmd.Execute()
 }
 
-func displayMovies(movies []Movie) {
+func displayMovies(movies []Program) {
 	maxTitleLength := 0
 	for _, movie := range movies {
 		if len(movie.Title) > maxTitleLength {
@@ -92,8 +106,11 @@ func displayMovies(movies []Movie) {
 
 	columns := []table.Column{
 		{Title: "Title", Width: maxTitleLength + 10},
-		{Title: "Year", Width: 18},
+		{Title: "Year", Width: 16},
+		{Title: "Score", Width: 6},
 		{Title: "Type", Width: 10},
+		{Title: "Length", Width: 10},
+		{Title: "Seasons", Width: 10},
 		{Title: "Link", Width: 0},
 	}
 
@@ -102,12 +119,15 @@ func displayMovies(movies []Movie) {
 	// linkColor := color.New(color.FgYellow).SprintFunc()
 
 	var rows []table.Row
-	for _, movie := range movies {
+	for _, item := range movies {
 		rows = append(rows, table.Row{
-			titleColor(movie.Title),
-			yearColor(movie.Year),
-			movie.Type,
-			fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID),
+			titleColor(item.Title),
+			yearColor(item.Year),
+			item.Score,
+			item.Type,
+			item.Length,
+			item.Seasons,
+			fmt.Sprintf("https://www.imdb.com/title/%s", item.IMDBID),
 		})
 	}
 
@@ -134,7 +154,7 @@ func openBrowser(url string) {
 	}
 }
 
-func searchOMDB(title, year string) ([]Movie, error) {
+func searchOMDB(title, year string) ([]Program, error) {
 	url := fmt.Sprintf("http://www.omdbapi.com/?s=%s&y=%s&apikey=%s", title, year, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -143,7 +163,7 @@ func searchOMDB(title, year string) ([]Movie, error) {
 	defer resp.Body.Close()
 
 	var result struct {
-		Search []Movie `json:"Search"`
+		Search []Program `json:"Search"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -151,4 +171,20 @@ func searchOMDB(title, year string) ([]Movie, error) {
 	}
 
 	return result.Search, nil
+}
+
+func getProgramInfo(imdbID string) (Program, error) {
+	url := fmt.Sprintf("http://www.omdbapi.com/?i=%s&apikey=%s", imdbID, apiKey)
+	resp, err := http.Get(url)
+	if err != nil {
+		return Program{}, err
+	}
+	defer resp.Body.Close()
+
+	var info Program
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return Program{}, err
+	}
+
+	return info, nil
 }
