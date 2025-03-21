@@ -3,27 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	// "os"
-	"os"
-	"os/exec"
-	// "text/tabwriter"
-
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
-	// "github.com/charmbracelet/lipgloss" 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"net/http"
+	"os"
+	"os/exec"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
-
-// var (
-// 	regStyle   = lipgloss.NewStyle()
-// 	idStyle    = lipgloss.NewStyle().Inline(true).Foreground(lipgloss.Color("205"))
-// 	titleStyle = lipgloss.NewStyle().Inline(true).Foreground(lipgloss.Color("69"))
-// 	yearStyle  = lipgloss.NewStyle().Inline(true).Foreground(lipgloss.Color("99"))
-// )
 
 type Movie struct {
 	Title  string `json:"Title"`
@@ -33,36 +22,35 @@ type Movie struct {
 }
 
 type model struct {
-    table table.Model
+	table table.Model
 }
 
 func (m model) Init() tea.Cmd {
-    return nil
+	return nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    switch msg := msg.(type) {
-    case tea.KeyMsg:
-        switch msg.String() {
-        case "ctrl+c", "q":
-            return m, tea.Quit
-        case "up":
-            m.table.MoveUp(1)
-        case "down":
-		m.table.MoveDown(1)
-        case "enter":
-		selectedRow := m.table.SelectedRow()
-		link := string(selectedRow[3])
-		openBrowser(link)
-		return m,tea.Quit
-        }
-    }
-    return m, nil
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "up":
+			m.table.MoveUp(1)
+		case "down":
+			m.table.MoveDown(1)
+		case "enter":
+			selectedRow := m.table.SelectedRow()
+			link := string(selectedRow[3])
+			openBrowser(link)
+			return m, tea.Quit
+		}
+	}
+	return m, nil
 }
 
-
 func (m model) View() string {
-    return m.table.View()
+	return m.table.View()
 }
 
 func main() {
@@ -95,28 +83,23 @@ func main() {
 }
 
 func displayMovies(movies []Movie) {
-	// maxTitleLength := 0
-	// for _, movie := range movies {
-	// 	if len(movie.Title) > maxTitleLength {
-	// 		maxTitleLength = len(movie.Title)
-	// 	}
-	// }
-
-	columns := []table.Column{
-		{Title: "Title", Width: 50},
-		{Title: "Year", Width: 18},
-		{Title: "Type", Width: 10},
-		{Title: "Link", Width: 100},
+	maxTitleLength := 0
+	for _, movie := range movies {
+		if len(movie.Title) > maxTitleLength {
+			maxTitleLength = len(movie.Title)
+		}
 	}
 
-	// rows := []table.Row{
-	// 	{"1", "The Shawshank Redemption", "1994"},
-	// 	{"2", "The Godfather", "1972"},
-	// 	{"3", "The Dark Knight", "2008"},
-	// }
+	columns := []table.Column{
+		{Title: "Title", Width: maxTitleLength + 10},
+		{Title: "Year", Width: 18},
+		{Title: "Type", Width: 10},
+		{Title: "Link", Width: 0},
+	}
+
 	titleColor := color.New(color.FgCyan).SprintFunc()
 	yearColor := color.New(color.FgGreen).SprintFunc()
-	linkColor := color.New(color.FgYellow).SprintFunc()
+	// linkColor := color.New(color.FgYellow).SprintFunc()
 
 	var rows []table.Row
 	for _, movie := range movies {
@@ -124,12 +107,10 @@ func displayMovies(movies []Movie) {
 			titleColor(movie.Title),
 			yearColor(movie.Year),
 			movie.Type,
-			linkColor(fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)),
-			// titleStyle.Render(movie.Title),
-			// yearStyle.Render(fmt.Sprintf("%s",movie.Year)),
-			// movie.Type,
-			// idStyle.Render(fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID))})
-		})}
+			fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID),
+		})
+	}
+
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
@@ -144,23 +125,9 @@ func displayMovies(movies []Movie) {
 		os.Exit(1)
 	}
 
-	// w := tabwriter.NewWriter(os.Stdout, 10, 1, 2, ' ', 0)
-
-	// fmt.Fprintln(w, "Title\tYear\tType\tIMDB_Link")
-	// for _, movie := range movies {
-	// 	fmt.Fprintf(w,
-	// 		"%s\t%s\t%s\t%s\n",
-	// 		titleColor(movie.Title),
-	// 		yearColor(movie.Year),
-	// 		movie.Type,
-	// 		linkColor(fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)))
-	// }
-
-	// w.Flush()
 }
 
 func openBrowser(url string) {
-	// url := fmt.Sprintf("https://www.imdb.com/title/%s", imdbID)
 	err := exec.Command("open", url).Start()
 	if err != nil {
 		fmt.Println("Error opening browser:", err)
