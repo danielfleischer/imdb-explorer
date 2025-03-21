@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
@@ -24,8 +26,24 @@ type Program struct {
 	Score   string `json:"imdbRating"`
 }
 
+type Episode struct {
+	Title    string `json:"Title"`
+	Released string `json:"Released"`
+	Episode  string `json:"Episode"`
+	ImdbID   string `json:"imdbID"`
+}
+
+type EpisodeResponse struct {
+	Title    string    `json:"Title"`
+	Season   string    `json:"Season"`
+	Episodes []Episode `json:"Episodes"`
+	Response string    `json:"Response"`
+}
+
 type model struct {
-	table table.Model
+	table           table.Model
+	state           string
+	selectedProgram Program
 }
 
 func (m model) Init() tea.Cmd {
@@ -43,10 +61,100 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "ctrl+n", "n":
 			m.table.MoveDown(1)
 		case "enter":
-			selectedRow := m.table.SelectedRow()
-			link := string(selectedRow[6])
-			openBrowser(link)
-			return m, tea.Quit
+			if m.state == "" || m.state == "default" {
+				selectedRow := m.table.SelectedRow()
+				if selectedRow[3] == "series" {
+					imdbID := strings.TrimPrefix(selectedRow[6], "https://www.imdb.com/title/")
+					m.selectedProgram = Program{
+						Title:   selectedRow[0],
+						Year:    selectedRow[1],
+						Score:   selectedRow[2],
+						Type:    selectedRow[3],
+						Length:  selectedRow[4],
+						Seasons: selectedRow[5],
+						IMDBID:  imdbID,
+					}
+					columns := []table.Column{
+						{Title: "Options", Width: 20},
+					}
+					optionsRows := []table.Row{
+						{"Browse"},
+						{"Find Episode"},
+					}
+					m.table = table.New(
+						table.WithColumns(columns),
+						table.WithRows(optionsRows),
+						table.WithFocused(true),
+					)
+					m.state = "episodeOptions"
+					return m, nil
+				} else {
+					link := string(selectedRow[6])
+					openBrowser(link)
+					return m, tea.Quit
+				}
+			} else if m.state == "episodeOptions" {
+				selectedOption := m.table.SelectedRow()[0]
+				if selectedOption == "Browse" {
+					openBrowser(fmt.Sprintf("https://www.imdb.com/title/%s", m.selectedProgram.IMDBID))
+					return m, tea.Quit
+				} else if selectedOption == "Find Episode" {
+					count, err := strconv.Atoi(m.selectedProgram.Seasons)
+					if err != nil {
+						fmt.Println("Invalid seasons count:", m.selectedProgram.Seasons)
+						return m, tea.Quit
+					}
+					columns := []table.Column{
+						{Title: "Season", Width: 10},
+					}
+					var seasonRows []table.Row
+					for i := 1; i <= count; i++ {
+						seasonRows = append(seasonRows, table.Row{fmt.Sprintf("%d", i)})
+					}
+					m.table = table.New(
+						table.WithColumns(columns),
+						table.WithRows(seasonRows),
+						table.WithFocused(true),
+					)
+					m.state = "seasonSelection"
+					return m, nil
+				}
+			} else if m.state == "seasonSelection" {
+				selectedSeason := m.table.SelectedRow()[0]
+				episodes, err := getEpisodes(m.selectedProgram.IMDBID, selectedSeason)
+				if err != nil {
+					fmt.Println("Error fetching episodes:", err)
+					return m, tea.Quit
+				}
+				columns := []table.Column{
+					{Title: "Episode", Width: 10},
+					{Title: "Title", Width: 30},
+					{Title: "Released", Width: 15},
+					{Title: "Link", Width: 0},
+				}
+				var episodeRows []table.Row
+				for _, ep := range episodes {
+					episodeRows = append(episodeRows, table.Row{
+						ep.Episode,
+						ep.Title,
+						ep.Released,
+						fmt.Sprintf("https://www.imdb.com/title/%s", ep.ImdbID),
+					})
+				}
+				m.table = table.New(
+					table.WithColumns(columns),
+					table.WithRows(episodeRows),
+					table.WithFocused(true),
+				)
+				m.state = "episodeDisplay"
+				return m, nil
+			} else if m.state == "episodeDisplay" {
+				selectedRow := m.table.SelectedRow()
+				link := string(selectedRow[3])
+				openBrowser(link)
+				return m, tea.Quit
+			}
+			return m, nil
 		}
 	}
 	return m, nil
@@ -187,4 +295,18 @@ func getProgramInfo(imdbID string) (Program, error) {
 	}
 
 	return info, nil
+}
+
+func getEpisodes(imdbID, season string) ([]Episode, error) {
+	url := fmt.Sprintf("http://www.omdbapi.com/?i=%s&Season=%s&apikey=%s", imdbID, season, apiKey)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var epResponse EpisodeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&epResponse); err != nil {
+		return nil, err
+	}
+	return epResponse.Episodes, nil
 }
