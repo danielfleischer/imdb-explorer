@@ -93,7 +93,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						table.WithRows(optionsRows),
 						table.WithFocused(true),
 					)
-					m.table.SetHeight(len(optionsRows) + 1)
+					m.table.SetHeight(len(optionsRows) + 2)
 					m.state = "episodeOptions"
 					return m, nil
 				} else {
@@ -124,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						table.WithRows(seasonRows),
 						table.WithFocused(true),
 					)
-					m.table.SetHeight(len(seasonRows) + 1)
+					m.table.SetHeight(len(seasonRows) + 2)
 					m.state = "seasonSelection"
 					return m, nil
 				}
@@ -157,7 +157,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					table.WithRows(episodeRows),
 					table.WithFocused(true),
 				)
-				m.table.SetHeight(len(episodeRows) + 1)
+				m.table.SetHeight(len(episodeRows) + 2)
 				m.state = "episodeDisplay"
 				return m, nil
 			} else if m.state == "episodeDisplay" {
@@ -173,7 +173,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return strings.TrimRight(m.table.View(), "\n")
+	return m.table.View()
 }
 
 func main() {
@@ -254,7 +254,7 @@ func displayMovies(movies []Program) {
 		table.WithRows(rows),
 		table.WithFocused(true),
 	)
-	t.SetHeight(len(rows) + 1)
+	t.SetHeight(len(rows) + 2)
 
 	m := model{table: t}
 
