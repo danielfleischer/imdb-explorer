@@ -13,7 +13,7 @@ Run the compiled binary with the movie or show title as an argument, and optiona
 ./imdb "The Matrix"
 ```
 
-Show more information with `TAB`.
+Browse with `RET`, toggle info-box with `TAB`, see reviews with `r`, go back with `b`.
 
 > [!NOTE]  
 > #### Created using [Aider](https://aider.chat/).
