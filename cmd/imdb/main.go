@@ -136,9 +136,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					fmt.Println("Error fetching episodes:", err)
 					return m, tea.Quit
 				}
+				maxTitleLength := 0
+				for _, episode := range episodes {
+					if len(episode.Title) > maxTitleLength {
+						maxTitleLength = len(episode.Title)
+					}
+				}
 				columns := []table.Column{
 					{Title: "Episode", Width: 10},
-					{Title: "Title", Width: 38},
+					{Title: "Title", Width: maxTitleLength + 10},
 					{Title: "Rating", Width: 12},
 					{Title: "Released", Width: 20},
 					{Title: "Link", Width: 0},
