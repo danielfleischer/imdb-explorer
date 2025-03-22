@@ -70,6 +70,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.table.MoveUp(1)
 		case "down", "ctrl+n", "n":
 			m.table.MoveDown(1)
+		case "r":
+			var linkIndex int
+			switch m.state {
+			case "", "default":
+				linkIndex = 6
+			case "episodeDisplay":
+				linkIndex = 4
+			default:
+				linkIndex = 6
+			}
+			selectedRow := m.table.SelectedRow()
+			openBrowser(fmt.Sprintf("%s/reviews", selectedRow[linkIndex]))
+			return m, tea.Quit
 		case "enter":
 			if m.state == "" || m.state == "default" {
 				selectedRow := m.table.SelectedRow()
