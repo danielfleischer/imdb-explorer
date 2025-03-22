@@ -13,6 +13,7 @@ Run the compiled binary with the movie or show title as an argument, and optiona
 ./imdb "The Matrix"
 ```
 
+Show more information with `TAB`.
 
 > [!NOTE]  
 > #### Created using [Aider](https://aider.chat/).
@@ -39,7 +40,7 @@ Alternatively, you can use the provided Makefile targets to manage the project:
 ## TODO
 
 - [x] Jump to reviews (shortcut or a menu).
-- [ ] Show more info for a movie: rating, genre, director, awards, plot, etc.
+- [x] Show more info for a movie: rating, genre, director, awards, plot, etc.
 - [ ] Show poster (maybe terminal dependent).
 
 ## License

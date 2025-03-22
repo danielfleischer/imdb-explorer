@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -38,7 +39,7 @@ type Episode struct {
 	Title    string `json:"Title"`
 	Released string `json:"Released"`
 	Episode  string `json:"Episode"`
-	ImdbID   string `json:"imdbID"`
+	IMDBID   string `json:"imdbID"`
 	Rating   string `json:"imdbRating"`
 }
 
@@ -49,12 +50,20 @@ type EpisodeResponse struct {
 	Response string    `json:"Response"`
 }
 
-type EpisodeRow struct {
-	Episode  string
-	Title    string
-	Rating   string
-	Released string
-	Link     string
+type MovieDetails struct {
+	Title    string `json:"Title"`
+	Year     string `json:"Year"`
+	Rated    string `json:"Rated"`
+	Genre    string `json:"Genre"`
+	Director string `json:"Director"`
+	Plot     string `json:"Plot"`
+	Awards   string `json:"Awards"`
+}
+
+type detailsMsg struct {
+	details string
+	err     error
+	imdbID  string
 }
 
 type model struct {
@@ -62,7 +71,11 @@ type model struct {
 	state           string
 	selectedProgram Program
 	movies          []Program
-	episodeRows     []EpisodeRow
+	episodeRows     []Episode
+	infoViewport    viewport.Model
+	showDetails     bool
+	details         string
+	detailsCache    map[string]string
 }
 
 func (m model) Init() tea.Cmd {
@@ -77,22 +90,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "up", "ctrl+p", "p":
 			m.table.MoveUp(1)
+			return maybeUpdateDetails(m)
 		case "down", "ctrl+n", "n":
 			m.table.MoveDown(1)
+			return maybeUpdateDetails(m)
+		case "tab":
+			m.showDetails = !m.showDetails
+			if m.showDetails && (m.state == "" || m.state == "default" || m.state == "seasonSelection") {
+				var imdbID string
+				if m.state == "" || m.state == "default" {
+					imdbID = m.movies[m.table.Cursor()].IMDBID
+				} else {
+					imdbID = m.episodeRows[m.table.Cursor()].IMDBID
+				}
+				vp := viewport.New(100, 10)
+				vp.SetContent("")
+				m.infoViewport = vp
+				if details, ok := m.detailsCache[imdbID]; ok {
+					m.details = details
+					m.infoViewport.SetContent(details)
+					return m, nil
+				}
+				return m, fetchDetailsCmd(imdbID)
+			}
 		case "r":
-			var link string
+			var id string
 			switch m.state {
 			case "", "default":
-				movie := m.movies[m.table.Cursor()]
-				link = fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)
+				id = m.movies[m.table.Cursor()].IMDBID
 			case "episodeDisplay":
-				link = m.episodeRows[m.table.Cursor()].Link
-			default:
-				movie := m.movies[m.table.Cursor()]
-				link = fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)
+				id = m.episodeRows[m.table.Cursor()].IMDBID
 			}
-			openBrowser(fmt.Sprintf("%s/reviews", link))
-			return m, tea.Quit
+			if id != "" {
+				openBrowser(fmt.Sprintf("https://www.imdb.com/title/%s/reviews", id))
+				return m, tea.Quit
+			}
 		case "enter":
 			if m.state == "" || m.state == "default" {
 				movie := m.movies[m.table.Cursor()]
@@ -165,21 +197,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					{Title: "Link", Width: 0},
 				}
 				var tableRows []table.Row
-				var episodeRows []EpisodeRow
+				var episodeRows []Episode
 				for _, ep := range episodes {
-					episodeRows = append(episodeRows, EpisodeRow{
-						Episode:  ep.Episode,
-						Title:    ep.Title,
-						Rating:   ep.Rating,
-						Released: ep.Released,
-						Link:     fmt.Sprintf("https://www.imdb.com/title/%s", ep.ImdbID),
-					})
+					episodeRows = append(episodeRows, ep)
 					tableRows = append(tableRows, table.Row{
 						ep.Episode,
 						titleColor(ep.Title),
 						ratingColor(ep.Rating),
 						yearColor(ep.Released),
-						fmt.Sprintf("https://www.imdb.com/title/%s", ep.ImdbID),
+						fmt.Sprintf("https://www.imdb.com/title/%s", ep.IMDBID),
 					})
 				}
 				m.table = table.New(
@@ -190,20 +216,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.table.SetHeight(len(tableRows) + 2)
 				m.episodeRows = episodeRows
 				m.state = "episodeDisplay"
+				if m.showDetails {
+					return m, fetchDetailsCmd(m.episodeRows[m.table.Cursor()].IMDBID)
+				}
 				return m, nil
 			} else if m.state == "episodeDisplay" {
-				link := m.episodeRows[m.table.Cursor()].Link
+				link := m.episodeRows[m.table.Cursor()].IMDBID
 				openBrowser(link)
 				return m, tea.Quit
 			}
 			return m, nil
 		}
+	case detailsMsg:
+		if msg.err != nil {
+			m.details = "Error fetching details"
+		} else {
+			m.details = msg.details
+		}
+		m.detailsCache[msg.imdbID] = m.details
+		m.infoViewport.SetContent(m.details)
+		return m, nil
 	}
 	return m, nil
 }
 
 func (m model) View() string {
-	return m.table.View() + hintColor("\n\nRET: browse, r: reviews, up/down/n/p: move, q: quit")
+	view := ""
+	view += m.table.View() + hintColor("\n\nRET: browse, r: reviews, TAB: toggle details, up/down/n/p: move, q: quit")
+	if m.showDetails {
+		view += "\n\n================ DETAILS =================\n"
+		view += m.infoViewport.View() + "\n"
+		view += "=========================================\n"
+	}
+	return view
 }
 
 func main() {
@@ -284,7 +329,7 @@ func displayMovies(movies []Program) {
 	)
 	t.SetHeight(len(rows) + 2)
 
-	m := model{table: t, movies: movies}
+	m := model{table: t, movies: movies, detailsCache: make(map[string]string)}
 
 	p := tea.NewProgram(m)
 	if err := p.Start(); err != nil {
@@ -348,4 +393,53 @@ func getEpisodes(imdbID, season string) ([]Episode, error) {
 		return nil, err
 	}
 	return epResponse.Episodes, nil
+}
+
+func maybeUpdateDetails(m model) (model, tea.Cmd) {
+    if m.showDetails && (m.state == "" || m.state == "default" || m.state == "episodeDisplay") {
+        var imdbID string
+        if m.state == "" || m.state == "default" {
+            imdbID = m.movies[m.table.Cursor()].IMDBID
+        } else {
+            imdbID = m.episodeRows[m.table.Cursor()].IMDBID
+        }
+        if details, ok := m.detailsCache[imdbID]; ok {
+            m.details = details
+            m.infoViewport.SetContent(details)
+            return m, nil
+        }
+        return m, fetchDetailsCmd(imdbID)
+    }
+    return m, nil
+}
+
+func fetchDetailsCmd(imdbID string) tea.Cmd {
+	return func() tea.Msg {
+		details, err := getDetails(imdbID)
+		return detailsMsg{details: details, err: err, imdbID: imdbID}
+	}
+}
+
+func getDetails(imdbID string) (string, error) {
+	url := fmt.Sprintf("https://www.omdbapi.com/?i=%s&apikey=%s", imdbID, apiKey)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var detailsObj MovieDetails
+	if err := json.NewDecoder(resp.Body).Decode(&detailsObj); err != nil {
+		return "", err
+	}
+	details := fmt.Sprintf(
+		"Title: %s\nYear: %s\nRated: %s\nGenre: %s\nDirector: %s\nPlot: %s\nAwards: %s",
+		detailsObj.Title,
+		detailsObj.Year,
+		detailsObj.Rated,
+		detailsObj.Genre,
+		detailsObj.Director,
+		detailsObj.Plot,
+		detailsObj.Awards,
+	)
+	return details, nil
 }
