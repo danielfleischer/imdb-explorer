@@ -13,10 +13,9 @@ Run the compiled binary with the movie or show title as an argument, and optiona
 ./imdb "The Matrix"
 ```
 
-Browse with `RET`, toggle info-box with `TAB`, see reviews with `r`, go back with `b`.
+> [!TIP]
+> Browse with `RET`, toggle info-box with `TAB`, see reviews with `r`, go back with `b`.
 
-> [!NOTE]  
-> #### Created using [Aider](https://aider.chat/).
 
 -----------
 
@@ -36,6 +35,11 @@ go build ./cmd/imdb
 Alternatively, you can use the provided Makefile targets to manage the project:
 - Build the application: `make build`
 - Install the application: `make install`
+
+------------
+
+> [!NOTE]  
+> #### Developed using [Aider](https://aider.chat/).
 
 ## TODO
 
