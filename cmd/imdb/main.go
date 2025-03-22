@@ -96,7 +96,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return maybeUpdateDetails(m)
 		case "tab":
 			m.showDetails = !m.showDetails
-			if m.showDetails && (m.state == "" || m.state == "default" || m.state == "seasonSelection") {
+			if m.showDetails && (m.state == "" || m.state == "default" || m.state == "episodeDisplay") {
 				var imdbID string
 				if m.state == "" || m.state == "default" {
 					imdbID = m.movies[m.table.Cursor()].IMDBID
@@ -124,6 +124,84 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if id != "" {
 				openBrowser(fmt.Sprintf("https://www.imdb.com/title/%s/reviews", id))
 				return m, tea.Quit
+			}
+		case "b":
+			switch m.state {
+			case "episodeDisplay":
+				// Go back one level: from episodeDisplay to seasonSelection.
+				count, err := strconv.Atoi(m.selectedProgram.Seasons)
+				if err != nil {
+					fmt.Println("Invalid seasons count:", m.selectedProgram.Seasons)
+					return m, tea.Quit
+				}
+				columns := []table.Column{
+					{Title: "Season", Width: 10},
+				}
+				var seasonRows []table.Row
+				for i := 1; i <= count; i++ {
+					seasonRows = append(seasonRows, table.Row{fmt.Sprintf("%d", i)})
+				}
+				m.table = table.New(
+					table.WithColumns(columns),
+					table.WithRows(seasonRows),
+					table.WithFocused(true),
+				)
+				m.table.SetHeight(len(seasonRows) + 2)
+				m.state = "seasonSelection"
+				if m.showDetails {
+					return m, fetchDetailsCmd(m.selectedProgram.IMDBID)
+				}
+				return m, nil
+			case "seasonSelection", "episodeOptions":
+				// Go back one level: from seasonSelection (or episodeOptions) to main modal.
+				{
+					maxTitleLength := 0
+					for _, movie := range m.movies {
+						if len(movie.Title) > maxTitleLength {
+							maxTitleLength = len(movie.Title)
+						}
+					}
+					columns := []table.Column{
+						{Title: "Title", Width: maxTitleLength + 10},
+						{Title: "Year", Width: 16},
+						{Title: "Rating", Width: 12},
+						{Title: "Type", Width: 10},
+						{Title: "Length", Width: 10},
+						{Title: "Seasons", Width: 10},
+						{Title: "Link", Width: 0},
+					}
+					var rows []table.Row
+					for _, item := range m.movies {
+						rows = append(rows, table.Row{
+							titleColor(item.Title),
+							yearColor(item.Year),
+							ratingColor(item.Rating),
+							cases.Title(language.English).String(item.Type),
+							item.Length,
+							item.Seasons,
+							fmt.Sprintf("https://www.imdb.com/title/%s", item.IMDBID),
+						})
+					}
+					m.table = table.New(
+						table.WithColumns(columns),
+						table.WithRows(rows),
+						table.WithFocused(true),
+					)
+					m.table.SetHeight(len(rows) + 2)
+					m.state = ""
+					if m.showDetails {
+						imdbID := m.movies[m.table.Cursor()].IMDBID
+						if details, ok := m.detailsCache[imdbID]; ok {
+							m.details = details
+							m.infoViewport.SetContent(details)
+							return m, nil
+						}
+						return m, fetchDetailsCmd(imdbID)
+					}
+					return m, nil
+				}
+			default:
+				return m, nil
 			}
 		case "enter":
 			if m.state == "" || m.state == "default" {
@@ -174,6 +252,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					)
 					m.table.SetHeight(len(seasonRows) + 2)
 					m.state = "seasonSelection"
+					if m.showDetails {
+						return m, fetchDetailsCmd(m.selectedProgram.IMDBID)
+					}
 					return m, nil
 				}
 			} else if m.state == "seasonSelection" {
@@ -242,7 +323,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	view := ""
-	view += m.table.View() + hintColor("\n\nRET: browse, r: reviews, TAB: toggle details, up/down/n/p: move, q: quit")
+	view += m.table.View() + hintColor("\n\nRET: browse, r: reviews, TAB: toggle details, up/down/n/p: move, b: go back q: quit")
 	if m.showDetails {
 		view += "\n\n================ DETAILS =================\n"
 		view += m.infoViewport.View() + "\n"
