@@ -36,6 +36,12 @@ Alternatively, you can use the provided Makefile targets to manage the project:
 - Build the application: `make build`
 - Install the application: `make install`
 
+## TODO
+
+- [ ] Jump to reviews (shortcut or a menu).
+- [ ] Show more info for a movie: rating, genre, director, awards, plot, etc.
+- [ ] Show poster (maybe terminal dependent).
+
 ## License
 
 Apache-2.0 License.
