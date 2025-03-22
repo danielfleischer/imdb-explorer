@@ -22,7 +22,8 @@ var (
 	titleColor  = color.New(color.FgCyan).SprintFunc()
 	yearColor   = color.New(color.FgGreen).SprintFunc()
 	ratingColor = color.New(color.FgHiBlue).SprintFunc()
-	hintColor   = color.New(color.FgHiBlack).SprintFunc()
+	infoColor = color.New(color.FgYellow).SprintFunc()
+	hintColor   = color.New(color.FgHiBlack, color.Bold).SprintFunc()
 )
 
 type Program struct {
@@ -323,11 +324,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	view := ""
-	view += m.table.View() + hintColor("\n\nRET: browse, r: reviews, TAB: toggle details, up/down/n/p: move, b: go back q: quit")
+	view += m.table.View() + hintColor("\n\nRET: browse | r: reviews | TAB: toggle details | up/down/n/p: move | b: back | q: quit")
 	if m.showDetails {
-		view += "\n\n================ DETAILS =================\n"
-		view += m.infoViewport.View() + "\n"
-		view += "=========================================\n"
+		view += infoColor("\n================ DETAILS =================\n\n")
+		view += infoColor(m.infoViewport.View() + "\n")
+		view += infoColor("=========================================\n")
 	}
 	return view
 }
