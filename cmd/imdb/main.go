@@ -6,9 +6,9 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
+	"github.com/spf13/cobra"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"github.com/spf13/cobra"
 	"net/http"
 	"os"
 	"os/exec"
@@ -281,7 +281,7 @@ func openBrowser(url string) {
 }
 
 func searchOMDB(title, year string) ([]Program, error) {
-	url := fmt.Sprintf("http://www.omdbapi.com/?s=%s&y=%s&apikey=%s", title, year, apiKey)
+	url := fmt.Sprintf("https://www.omdbapi.com/?s=%s&y=%s&apikey=%s", title, year, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ func searchOMDB(title, year string) ([]Program, error) {
 }
 
 func getProgramInfo(imdbID string) (Program, error) {
-	url := fmt.Sprintf("http://www.omdbapi.com/?i=%s&apikey=%s", imdbID, apiKey)
+	url := fmt.Sprintf("https://www.omdbapi.com/?i=%s&apikey=%s", imdbID, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
 		return Program{}, err
@@ -316,7 +316,7 @@ func getProgramInfo(imdbID string) (Program, error) {
 }
 
 func getEpisodes(imdbID, season string) ([]Episode, error) {
-	url := fmt.Sprintf("http://www.omdbapi.com/?i=%s&Season=%s&apikey=%s", imdbID, season, apiKey)
+	url := fmt.Sprintf("https://www.omdbapi.com/?i=%s&Season=%s&apikey=%s", imdbID, season, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
