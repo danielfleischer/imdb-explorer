@@ -1,11 +1,11 @@
 # CLI IMDB Search
 
-A simple CLI application to search movies using the OMDB API.
+A simple CLI application to search movies and shows using the OMDB API.
 
 ## Prerequisites
 
-- Go installed (tested with go 1.24.1)
-- Environment variable `OMDB_API_KEY` set with your OMDB API key
+- Go installed (tested with go 1.24.1).
+- Environment variable `OMDB_API_KEY` set with your [OMDB API](https://www.omdbapi.com/) (free) key.
 
 ## Project Structure
 
@@ -32,7 +32,7 @@ go build ./cmd/imdb
 Run the compiled binary with the movie title as an argument. For example:
 
 ```bash
-./imdb "The Matrix"
+./imdb The Matrix
 ```
 
 Alternatively, you can use the provided Makefile targets to manage the project:
@@ -41,4 +41,4 @@ Alternatively, you can use the provided Makefile targets to manage the project:
 
 ## License
 
-MIT License
+Apache-2.0 License.
