@@ -35,6 +35,10 @@ Run the compiled binary with the movie title as an argument. For example:
 ./imdb "The Matrix"
 ```
 
+Alternatively, you can use the provided Makefile targets to manage the project:
+- Build the application: `make build`
+- Install the application: `make install`
+
 ## License
 
 MIT License
