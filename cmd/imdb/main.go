@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
@@ -50,10 +49,20 @@ type EpisodeResponse struct {
 	Response string    `json:"Response"`
 }
 
+type EpisodeRow struct {
+	Episode  string
+	Title    string
+	Rating   string
+	Released string
+	Link     string
+}
+
 type model struct {
 	table           table.Model
 	state           string
 	selectedProgram Program
+	movies          []Program
+	episodeRows     []EpisodeRow
 }
 
 func (m model) Init() tea.Cmd {
@@ -71,32 +80,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "ctrl+n", "n":
 			m.table.MoveDown(1)
 		case "r":
-			var linkIndex int
+			var link string
 			switch m.state {
 			case "", "default":
-				linkIndex = 6
+				movie := m.movies[m.table.Cursor()]
+				link = fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)
 			case "episodeDisplay":
-				linkIndex = 4
+				link = m.episodeRows[m.table.Cursor()].Link
 			default:
-				linkIndex = 6
+				movie := m.movies[m.table.Cursor()]
+				link = fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID)
 			}
-			selectedRow := m.table.SelectedRow()
-			openBrowser(fmt.Sprintf("%s/reviews", selectedRow[linkIndex]))
+			openBrowser(fmt.Sprintf("%s/reviews", link))
 			return m, tea.Quit
 		case "enter":
 			if m.state == "" || m.state == "default" {
-				selectedRow := m.table.SelectedRow()
-				if selectedRow[3] == "Series" {
-					imdbID := strings.TrimPrefix(selectedRow[6], "https://www.imdb.com/title/")
-					m.selectedProgram = Program{
-						Title:   selectedRow[0],
-						Year:    selectedRow[1],
-						Rating:  selectedRow[2],
-						Type:    selectedRow[3],
-						Length:  selectedRow[4],
-						Seasons: selectedRow[5],
-						IMDBID:  imdbID,
-					}
+				movie := m.movies[m.table.Cursor()]
+				if movie.Type == "series" {
+					m.selectedProgram = movie
 					columns := []table.Column{
 						{Title: "Options", Width: 20},
 					}
@@ -113,8 +114,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = "episodeOptions"
 					return m, nil
 				} else {
-					link := string(selectedRow[6])
-					openBrowser(link)
+					openBrowser(fmt.Sprintf("https://www.imdb.com/title/%s", movie.IMDBID))
 					return m, tea.Quit
 				}
 			} else if m.state == "episodeOptions" {
@@ -164,9 +164,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					{Title: "Released", Width: 20},
 					{Title: "Link", Width: 0},
 				}
-				var episodeRows []table.Row
+				var tableRows []table.Row
+				var episodeRows []EpisodeRow
 				for _, ep := range episodes {
-					episodeRows = append(episodeRows, table.Row{
+					episodeRows = append(episodeRows, EpisodeRow{
+						Episode:  ep.Episode,
+						Title:    ep.Title,
+						Rating:   ep.Rating,
+						Released: ep.Released,
+						Link:     fmt.Sprintf("https://www.imdb.com/title/%s", ep.ImdbID),
+					})
+					tableRows = append(tableRows, table.Row{
 						ep.Episode,
 						titleColor(ep.Title),
 						ratingColor(ep.Rating),
@@ -176,15 +184,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.table = table.New(
 					table.WithColumns(columns),
-					table.WithRows(episodeRows),
+					table.WithRows(tableRows),
 					table.WithFocused(true),
 				)
-				m.table.SetHeight(len(episodeRows) + 2)
+				m.table.SetHeight(len(tableRows) + 2)
+				m.episodeRows = episodeRows
 				m.state = "episodeDisplay"
 				return m, nil
 			} else if m.state == "episodeDisplay" {
-				selectedRow := m.table.SelectedRow()
-				link := string(selectedRow[4])
+				link := m.episodeRows[m.table.Cursor()].Link
 				openBrowser(link)
 				return m, tea.Quit
 			}
@@ -195,7 +203,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return m.table.View() + hintColor("\n\nRET: browse, up/down/n/p: move, q: quit")
+	return m.table.View() + hintColor("\n\nRET: browse, r: reviews, up/down/n/p: move, q: quit")
 }
 
 func main() {
@@ -276,7 +284,7 @@ func displayMovies(movies []Program) {
 	)
 	t.SetHeight(len(rows) + 2)
 
-	m := model{table: t}
+	m := model{table: t, movies: movies}
 
 	p := tea.NewProgram(m)
 	if err := p.Start(); err != nil {
