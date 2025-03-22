@@ -1,6 +1,8 @@
-# CLI IMDB Search
+# IMDB Explorer
 
 A simple CLI application to search movies and shows using the OMDB API.
+
+<img src="./screenshot.png" alt="image showing how to search shows and movies called 'the matrix'" width="600"/>
 
 ## Prerequisites
 
@@ -32,7 +34,7 @@ go build ./cmd/imdb
 Run the compiled binary with the movie title as an argument. For example:
 
 ```bash
-./imdb The Matrix
+./imdb "The Matrix"
 ```
 
 Alternatively, you can use the provided Makefile targets to manage the project:

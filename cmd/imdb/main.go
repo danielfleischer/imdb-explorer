@@ -174,7 +174,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return m.table.View() + hintColor("\n\nRET: select, up/down/n/p: move, q: quit")
+	return m.table.View() + hintColor("\n\nRET: browse, up/down/n/p: move, q: quit")
 }
 
 func main() {
