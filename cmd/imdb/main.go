@@ -6,6 +6,8 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"github.com/spf13/cobra"
 	"net/http"
 	"os"
@@ -71,7 +73,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.state == "" || m.state == "default" {
 				selectedRow := m.table.SelectedRow()
-				if selectedRow[3] == "series" {
+				if selectedRow[3] == "Series" {
 					imdbID := strings.TrimPrefix(selectedRow[6], "https://www.imdb.com/title/")
 					m.selectedProgram = Program{
 						Title:   selectedRow[0],
@@ -247,7 +249,7 @@ func displayMovies(movies []Program) {
 			titleColor(item.Title),
 			yearColor(item.Year),
 			ratingColor(item.Rating),
-			item.Type,
+			cases.Title(language.English).String(item.Type),
 			item.Length,
 			item.Seasons,
 			fmt.Sprintf("https://www.imdb.com/title/%s", item.IMDBID),
