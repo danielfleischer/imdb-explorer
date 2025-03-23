@@ -43,6 +43,7 @@ type Program struct {
 	Released string `json:"Released"`
 	Genre    string `json:"Genre"`
 	Director string `json:"Director"`
+	Actors   string `json:"Actors"`
 	Plot     string `json:"Plot"`
 	Awards   string `json:"Awards"`
 }
@@ -331,7 +332,7 @@ func main() {
 
 			s := spinner.New()
 			s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
-			
+
 			m := model{
 				table:        builtShowsTable([]Program{}),
 				programs:     []Program{},
@@ -520,12 +521,13 @@ func fetchDetailsCmd(imdbID string) tea.Cmd {
 
 func buildDetails(program Program) string {
 	return fmt.Sprintf(
-		"Title: %s\nYear: %s\nRated: %s\nGenre: %s\nDirector: %s\nPlot: %s\nAwards: %s",
+		"Title: %s\nYear: %s\nRated: %s\nGenre: %s\nDirector: %s\nActors: %s\nPlot: %s\nAwards: %s",
 		program.Title,
 		program.Year,
 		program.Rating,
 		program.Genre,
 		program.Director,
+		program.Actors,
 		program.Plot,
 		program.Awards,
 	)
