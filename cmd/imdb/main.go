@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"github.com/charmbracelet/bubbles/textinput"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
@@ -43,6 +44,23 @@ type Program struct {
 	Plot     string `json:"Plot"`
 	Awards   string `json:"Awards"`
 }
+func newSearchCmd(query string) tea.Cmd {
+	return func() tea.Msg {
+		imdbIDs, err := searchOMDB(query, "")
+		if err != nil {
+			return searchResultsMsg{err: err}
+		}
+		var programs []Program
+		for _, id := range imdbIDs {
+			program, err := getProgramInfo(id)
+			if err != nil {
+				return searchResultsMsg{err: err}
+			}
+			programs = append(programs, program)
+		}
+		return searchResultsMsg{programs: programs}
+	}
+}
 
 type EpisodeResponse struct {
 	Title    string    `json:"Title"`
@@ -56,6 +74,10 @@ type detailsMsg struct {
 	err     error
 	imdbID  string
 }
+type searchResultsMsg struct {
+	programs []Program
+	err      error
+}
 
 type model struct {
 	table           table.Model
@@ -66,6 +88,7 @@ type model struct {
 	infoViewport    viewport.Model
 	showDetails     bool
 	programCache    map[string]Program
+	newQueryInput   textinput.Model
 }
 
 func (m model) Init() tea.Cmd {
@@ -73,6 +96,16 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.state == "newQuery" {
+		var cmd tea.Cmd
+		m.newQueryInput, cmd = m.newQueryInput.Update(msg)
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
+			query := m.newQueryInput.Value()
+			m.state = ""
+			return m, newSearchCmd(query)
+		}
+		return m, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -102,6 +135,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, fetchDetailsCmd(imdbID)
 			}
+		case "s":
+			ti := textinput.New()
+			ti.Placeholder = "Enter new query"
+			ti.Focus()
+			ti.CharLimit = 156
+			m.newQueryInput = ti
+			m.episodeRows = nil
+			m.state = "newQuery"
+			return m, nil
 		case "r":
 			var id string
 			switch m.state {
@@ -224,11 +266,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.programCache[msg.imdbID] = msg.details
 		m.infoViewport.SetContent(buildDetails(msg.details))
 		return m, nil
+	case searchResultsMsg:
+		if msg.err != nil {
+			fmt.Println("Error searching:", msg.err)
+			return m, tea.Quit
+		}
+		m.programs = msg.programs
+		m.table = builtShowsTable(msg.programs)
+		m.state = ""
+		return m, nil
 	}
 	return m, nil
 }
 
 func (m model) View() string {
+	if m.state == "newQuery" {
+		return m.newQueryInput.View() + "\n\nPress enter to search."
+	}
 	view := ""
 	view += m.table.View() + hintColor("\n\nRET: browse | r: reviews | TAB: toggle details | up/down/n/p: move | b: back | q: quit")
 	if m.showDetails {
