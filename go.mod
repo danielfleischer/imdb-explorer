@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/fatih/color v1.18.0
 	github.com/spf13/cobra v1.9.1
+	golang.org/x/text v0.3.8
 )
 
 require (
@@ -31,5 +32,4 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.3.8 // indirect
 )

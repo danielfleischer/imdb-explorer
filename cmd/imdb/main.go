@@ -22,43 +22,31 @@ var (
 	titleColor  = color.New(color.FgCyan).SprintFunc()
 	yearColor   = color.New(color.FgGreen).SprintFunc()
 	ratingColor = color.New(color.FgHiBlue).SprintFunc()
-	infoColor = color.New(color.FgYellow).SprintFunc()
+	infoColor   = color.New(color.FgYellow).SprintFunc()
 	hintColor   = color.New(color.FgHiBlack, color.Bold).SprintFunc()
 )
 
 type Program struct {
-	Title   string `json:"Title"`
-	Year    string `json:"Year"`
-	IMDBID  string `json:"imdbID"`
-	Type    string `json:"Type"`
-	Seasons string `json:"totalSeasons"`
-	Length  string `json:"Runtime"`
-	Rating  string `json:"imdbRating"`
-}
-
-type Episode struct {
 	Title    string `json:"Title"`
-	Released string `json:"Released"`
-	Episode  string `json:"Episode"`
+	Year     string `json:"Year"`
 	IMDBID   string `json:"imdbID"`
+	Type     string `json:"Type"`
+	Seasons  string `json:"totalSeasons"`
+	Length   string `json:"Runtime"`
+	Episode  string `json:"Episode"`
 	Rating   string `json:"imdbRating"`
+	Released string `json:"Released"`
+	Genre    string `json:"Genre"`
+	Director string `json:"Director"`
+	Plot     string `json:"Plot"`
+	Awards   string `json:"Awards"`
 }
 
 type EpisodeResponse struct {
 	Title    string    `json:"Title"`
 	Season   string    `json:"Season"`
-	Episodes []Episode `json:"Episodes"`
+	Episodes []Program `json:"Episodes"`
 	Response string    `json:"Response"`
-}
-
-type MovieDetails struct {
-	Title    string `json:"Title"`
-	Year     string `json:"Year"`
-	Rated    string `json:"Rated"`
-	Genre    string `json:"Genre"`
-	Director string `json:"Director"`
-	Plot     string `json:"Plot"`
-	Awards   string `json:"Awards"`
 }
 
 type detailsMsg struct {
@@ -72,7 +60,7 @@ type model struct {
 	state           string
 	selectedProgram Program
 	movies          []Program
-	episodeRows     []Episode
+	episodeRows     []Program
 	infoViewport    viewport.Model
 	showDetails     bool
 	details         string
@@ -279,7 +267,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					{Title: "Link", Width: 0},
 				}
 				var tableRows []table.Row
-				var episodeRows []Episode
+				var episodeRows []Program
 				for _, ep := range episodes {
 					episodeRows = append(episodeRows, ep)
 					tableRows = append(tableRows, table.Row{
@@ -463,7 +451,7 @@ func getProgramInfo(imdbID string) (Program, error) {
 	return info, nil
 }
 
-func getEpisodes(imdbID, season string) ([]Episode, error) {
+func getEpisodes(imdbID, season string) ([]Program, error) {
 	url := fmt.Sprintf("https://www.omdbapi.com/?i=%s&Season=%s&apikey=%s", imdbID, season, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -478,21 +466,21 @@ func getEpisodes(imdbID, season string) ([]Episode, error) {
 }
 
 func maybeUpdateDetails(m model) (model, tea.Cmd) {
-    if m.showDetails && (m.state == "" || m.state == "default" || m.state == "episodeDisplay") {
-        var imdbID string
-        if m.state == "" || m.state == "default" {
-            imdbID = m.movies[m.table.Cursor()].IMDBID
-        } else {
-            imdbID = m.episodeRows[m.table.Cursor()].IMDBID
-        }
-        if details, ok := m.detailsCache[imdbID]; ok {
-            m.details = details
-            m.infoViewport.SetContent(details)
-            return m, nil
-        }
-        return m, fetchDetailsCmd(imdbID)
-    }
-    return m, nil
+	if m.showDetails && (m.state == "" || m.state == "default" || m.state == "episodeDisplay") {
+		var imdbID string
+		if m.state == "" || m.state == "default" {
+			imdbID = m.movies[m.table.Cursor()].IMDBID
+		} else {
+			imdbID = m.episodeRows[m.table.Cursor()].IMDBID
+		}
+		if details, ok := m.detailsCache[imdbID]; ok {
+			m.details = details
+			m.infoViewport.SetContent(details)
+			return m, nil
+		}
+		return m, fetchDetailsCmd(imdbID)
+	}
+	return m, nil
 }
 
 func fetchDetailsCmd(imdbID string) tea.Cmd {
@@ -509,7 +497,7 @@ func getDetails(imdbID string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	var detailsObj MovieDetails
+	var detailsObj Program
 	if err := json.NewDecoder(resp.Body).Decode(&detailsObj); err != nil {
 		return "", err
 	}
@@ -517,7 +505,7 @@ func getDetails(imdbID string) (string, error) {
 		"Title: %s\nYear: %s\nRated: %s\nGenre: %s\nDirector: %s\nPlot: %s\nAwards: %s",
 		detailsObj.Title,
 		detailsObj.Year,
-		detailsObj.Rated,
+		detailsObj.Rating,
 		detailsObj.Genre,
 		detailsObj.Director,
 		detailsObj.Plot,
