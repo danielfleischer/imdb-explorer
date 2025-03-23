@@ -59,7 +59,7 @@ type model struct {
 	table           table.Model
 	state           string
 	selectedProgram Program
-	movies          []Program
+	programs        []Program
 	episodeRows     []Program
 	infoViewport    viewport.Model
 	showDetails     bool
@@ -87,7 +87,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.showDetails && (m.state == "" || m.state == "default" || m.state == "episodeDisplay") {
 				var imdbID string
 				if m.state == "" || m.state == "default" {
-					imdbID = m.movies[m.table.Cursor()].IMDBID
+					imdbID = m.programs[m.table.Cursor()].IMDBID
 				} else {
 					imdbID = m.episodeRows[m.table.Cursor()].IMDBID
 				}
@@ -104,7 +104,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var id string
 			switch m.state {
 			case "", "default":
-				id = m.movies[m.table.Cursor()].IMDBID
+				id = m.programs[m.table.Cursor()].IMDBID
 			case "episodeDisplay":
 				id = m.episodeRows[m.table.Cursor()].IMDBID
 			}
@@ -116,68 +116,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.state {
 			case "episodeDisplay":
 				// Go back one level: from episodeDisplay to seasonSelection.
-				count, err := strconv.Atoi(m.selectedProgram.Seasons)
-				if err != nil {
-					fmt.Println("Invalid seasons count:", m.selectedProgram.Seasons)
-					return m, tea.Quit
-				}
-				columns := []table.Column{
-					{Title: "Season", Width: 10},
-				}
-				var seasonRows []table.Row
-				for i := 1; i <= count; i++ {
-					seasonRows = append(seasonRows, table.Row{fmt.Sprintf("%d", i)})
-				}
-				m.table = table.New(
-					table.WithColumns(columns),
-					table.WithRows(seasonRows),
-					table.WithFocused(true),
-				)
-				m.table.SetHeight(len(seasonRows) + 2)
-				m.state = "seasonSelection"
-				if m.showDetails {
-					return m, fetchDetailsCmd(m.selectedProgram.IMDBID)
-				}
-				return m, nil
+				return builtSeasonSelection(m)
 			case "seasonSelection", "episodeOptions":
 				// Go back one level: from seasonSelection (or episodeOptions) to main modal.
 				{
-					maxTitleLength := 0
-					for _, movie := range m.movies {
-						if len(movie.Title) > maxTitleLength {
-							maxTitleLength = len(movie.Title)
-						}
-					}
-					columns := []table.Column{
-						{Title: "Title", Width: maxTitleLength + 10},
-						{Title: "Year", Width: 16},
-						{Title: "Rating", Width: 12},
-						{Title: "Type", Width: 10},
-						{Title: "Length", Width: 10},
-						{Title: "Seasons", Width: 10},
-						{Title: "Link", Width: 0},
-					}
-					var rows []table.Row
-					for _, item := range m.movies {
-						rows = append(rows, table.Row{
-							titleColor(item.Title),
-							yearColor(item.Year),
-							ratingColor(item.Rating),
-							cases.Title(language.English).String(item.Type),
-							item.Length,
-							item.Seasons,
-							fmt.Sprintf("https://www.imdb.com/title/%s", item.IMDBID),
-						})
-					}
-					m.table = table.New(
-						table.WithColumns(columns),
-						table.WithRows(rows),
-						table.WithFocused(true),
-					)
-					m.table.SetHeight(len(rows) + 2)
+					m.table = builtShowsTable(m.programs)
 					m.state = ""
 					if m.showDetails {
-						imdbID := m.movies[m.table.Cursor()].IMDBID
+						imdbID := m.programs[m.table.Cursor()].IMDBID
 						if program, ok := m.programCache[imdbID]; ok {
 							m.infoViewport.SetContent(buildDetails(program))
 							return m, nil
@@ -191,7 +137,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "enter":
 			if m.state == "" || m.state == "default" {
-				movie := m.movies[m.table.Cursor()]
+				movie := m.programs[m.table.Cursor()]
 				if movie.Type == "series" {
 					m.selectedProgram = movie
 					columns := []table.Column{
@@ -219,29 +165,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					openBrowser(fmt.Sprintf("https://www.imdb.com/title/%s", m.selectedProgram.IMDBID))
 					return m, tea.Quit
 				} else if selectedOption == "Find Episode" {
-					count, err := strconv.Atoi(m.selectedProgram.Seasons)
-					if err != nil {
-						fmt.Println("Invalid seasons count:", m.selectedProgram.Seasons)
-						return m, tea.Quit
-					}
-					columns := []table.Column{
-						{Title: "Season", Width: 10},
-					}
-					var seasonRows []table.Row
-					for i := 1; i <= count; i++ {
-						seasonRows = append(seasonRows, table.Row{fmt.Sprintf("%d", i)})
-					}
-					m.table = table.New(
-						table.WithColumns(columns),
-						table.WithRows(seasonRows),
-						table.WithFocused(true),
-					)
-					m.table.SetHeight(len(seasonRows) + 2)
-					m.state = "seasonSelection"
-					if m.showDetails {
-						return m, fetchDetailsCmd(m.selectedProgram.IMDBID)
-					}
-					return m, nil
+					return builtSeasonSelection(m)
 				}
 			} else if m.state == "seasonSelection" {
 				selectedSeason := m.table.SelectedRow()[0]
@@ -343,7 +267,22 @@ func main() {
 				programs = append(programs, program)
 			}
 
-			displayShows(programs)
+			var t table.Model
+			t = builtShowsTable(programs)
+
+			m := model{table: t, programs: programs, programCache: func() map[string]Program {
+				cache := make(map[string]Program)
+				for _, program := range programs {
+					cache[program.IMDBID] = program
+				}
+				return cache
+			}()}
+
+			p := tea.NewProgram(m)
+			if _, err := p.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v", err)
+				os.Exit(1)
+			}
 		},
 	}
 
@@ -352,7 +291,33 @@ func main() {
 	rootCmd.Execute()
 }
 
-func displayShows(programs []Program) {
+func builtSeasonSelection(m model) (model, tea.Cmd) {
+	count, err := strconv.Atoi(m.selectedProgram.Seasons)
+	if err != nil {
+		fmt.Println("Invalid seasons count:", m.selectedProgram.Seasons)
+		return m, tea.Quit
+	}
+	columns := []table.Column{
+		{Title: "Select Season", Width: 16},
+	}
+	var seasonRows []table.Row
+	for i := 1; i <= count; i++ {
+		seasonRows = append(seasonRows, table.Row{fmt.Sprintf("%d", i)})
+	}
+	m.table = table.New(
+		table.WithColumns(columns),
+		table.WithRows(seasonRows),
+		table.WithFocused(true),
+	)
+	m.table.SetHeight(len(seasonRows) + 2)
+	m.state = "seasonSelection"
+	if m.showDetails {
+		return m, fetchDetailsCmd(m.selectedProgram.IMDBID)
+	}
+	return m, nil
+}
+
+func builtShowsTable(programs []Program) table.Model {
 	maxTitleLength := 0
 	for _, movie := range programs {
 		if len(movie.Title) > maxTitleLength {
@@ -389,21 +354,7 @@ func displayShows(programs []Program) {
 		table.WithFocused(true),
 	)
 	t.SetHeight(len(rows) + 2)
-
-	m := model{table: t, movies: programs, programCache: func() map[string]Program {
-		cache := make(map[string]Program)
-		for _, program := range programs {
-			cache[program.IMDBID] = program
-		}
-		return cache
-	}()}
-
-	p := tea.NewProgram(m)
-	if err := p.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v", err)
-		os.Exit(1)
-	}
-
+	return t
 }
 
 func openBrowser(url string) {
@@ -472,7 +423,7 @@ func maybeUpdateDetails(m model) (model, tea.Cmd) {
 	if m.showDetails && (m.state == "" || m.state == "default" || m.state == "episodeDisplay") {
 		var imdbID string
 		if m.state == "" || m.state == "default" {
-			imdbID = m.movies[m.table.Cursor()].IMDBID
+			imdbID = m.programs[m.table.Cursor()].IMDBID
 		} else {
 			imdbID = m.episodeRows[m.table.Cursor()].IMDBID
 		}
