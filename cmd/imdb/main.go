@@ -213,8 +213,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			} else if m.state == "episodeDisplay" {
-				link := m.episodeRows[m.table.Cursor()].IMDBID
-				openBrowser(link)
+				imdbID := m.episodeRows[m.table.Cursor()].IMDBID
+				openBrowser(fmt.Sprintf("https://www.imdb.com/title/%s", imdbID))
 				return m, tea.Quit
 			}
 			return m, nil
