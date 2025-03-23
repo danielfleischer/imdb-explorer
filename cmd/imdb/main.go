@@ -17,6 +17,7 @@ import (
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
+var Version = "dev"
 
 var (
 	titleColor  = color.New(color.FgCyan).SprintFunc()
@@ -244,6 +245,7 @@ func main() {
 		Use:   "imdb [movie title]",
 		Short: "CLI app to search movies on OMDB",
 		Args:  cobra.MinimumNArgs(1),
+		Version: Version,
 		Run: func(cmd *cobra.Command, args []string) {
 			title := args[0]
 			if apiKey == "" {
