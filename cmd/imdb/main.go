@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 )
 
@@ -360,8 +361,19 @@ func builtShowsTable(programs []Program) table.Model {
 }
 
 func openBrowser(url string) {
-	err := exec.Command("open", url).Start()
-	if err != nil {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", "", url)
+	default:
+		fmt.Println("Unsupported OS:", runtime.GOOS)
+		os.Exit(1)
+	}
+	if err := cmd.Start(); err != nil {
 		fmt.Println("Error opening browser:", err)
 	}
 }

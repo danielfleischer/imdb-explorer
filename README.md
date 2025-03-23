@@ -45,7 +45,7 @@ Alternatively, you can use the provided Makefile targets to manage the project:
 
 - [x] Jump to reviews (shortcut or a menu).
 - [x] Show more info for a movie: rating, genre, director, awards, plot, etc.
-- [ ] Add general support for opening links; currently using `open`.
+- [x] Add general support for opening links; currently using `open`.
 - [ ] Show poster (maybe terminal dependent).
 
 ## License
