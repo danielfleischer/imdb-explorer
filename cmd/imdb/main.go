@@ -50,7 +50,7 @@ type EpisodeResponse struct {
 }
 
 type detailsMsg struct {
-	details string
+	details Program
 	err     error
 	imdbID  string
 }
@@ -63,8 +63,7 @@ type model struct {
 	episodeRows     []Program
 	infoViewport    viewport.Model
 	showDetails     bool
-	details         string
-	detailsCache    map[string]string
+	programCache    map[string]Program
 }
 
 func (m model) Init() tea.Cmd {
@@ -95,9 +94,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				vp := viewport.New(100, 10)
 				vp.SetContent("")
 				m.infoViewport = vp
-				if details, ok := m.detailsCache[imdbID]; ok {
-					m.details = details
-					m.infoViewport.SetContent(details)
+				if program, ok := m.programCache[imdbID]; ok {
+					m.infoViewport.SetContent(buildDetails(program))
 					return m, nil
 				}
 				return m, fetchDetailsCmd(imdbID)
@@ -180,9 +178,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = ""
 					if m.showDetails {
 						imdbID := m.movies[m.table.Cursor()].IMDBID
-						if details, ok := m.detailsCache[imdbID]; ok {
-							m.details = details
-							m.infoViewport.SetContent(details)
+						if program, ok := m.programCache[imdbID]; ok {
+							m.infoViewport.SetContent(buildDetails(program))
 							return m, nil
 						}
 						return m, fetchDetailsCmd(imdbID)
@@ -298,13 +295,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case detailsMsg:
-		if msg.err != nil {
-			m.details = "Error fetching details"
-		} else {
-			m.details = msg.details
-		}
-		m.detailsCache[msg.imdbID] = m.details
-		m.infoViewport.SetContent(m.details)
+		m.programCache[msg.imdbID] = msg.details
+		m.infoViewport.SetContent(buildDetails(msg.details))
 		return m, nil
 	}
 	return m, nil
@@ -335,24 +327,23 @@ func main() {
 				return
 			}
 
-			movies, err := searchOMDB(title, year)
+			IMDBIDs, err := searchOMDB(title, year)
 			if err != nil {
 				fmt.Println("Error:", err)
 				return
 			}
 
-			for i, movie := range movies {
-				info, err := getProgramInfo(movie.IMDBID)
+			var programs []Program
+			for _, id := range IMDBIDs {
+				program, err := getProgramInfo(id)
 				if err != nil {
 					fmt.Println("Error:", err)
 					return
 				}
-				movies[i].Seasons = info.Seasons
-				movies[i].Length = info.Length
-				movies[i].Rating = info.Rating
+				programs = append(programs, program)
 			}
 
-			displayMovies(movies)
+			displayShows(programs)
 		},
 	}
 
@@ -361,9 +352,9 @@ func main() {
 	rootCmd.Execute()
 }
 
-func displayMovies(movies []Program) {
+func displayShows(programs []Program) {
 	maxTitleLength := 0
-	for _, movie := range movies {
+	for _, movie := range programs {
 		if len(movie.Title) > maxTitleLength {
 			maxTitleLength = len(movie.Title)
 		}
@@ -380,7 +371,7 @@ func displayMovies(movies []Program) {
 	}
 
 	var rows []table.Row
-	for _, item := range movies {
+	for _, item := range programs {
 		rows = append(rows, table.Row{
 			titleColor(item.Title),
 			yearColor(item.Year),
@@ -399,7 +390,13 @@ func displayMovies(movies []Program) {
 	)
 	t.SetHeight(len(rows) + 2)
 
-	m := model{table: t, movies: movies, detailsCache: make(map[string]string)}
+	m := model{table: t, movies: programs, programCache: func() map[string]Program {
+		cache := make(map[string]Program)
+		for _, program := range programs {
+			cache[program.IMDBID] = program
+		}
+		return cache
+	}()}
 
 	p := tea.NewProgram(m)
 	if err := p.Start(); err != nil {
@@ -416,7 +413,7 @@ func openBrowser(url string) {
 	}
 }
 
-func searchOMDB(title, year string) ([]Program, error) {
+func searchOMDB(title, year string) ([]string, error) {
 	url := fmt.Sprintf("https://www.omdbapi.com/?s=%s&y=%s&apikey=%s", title, year, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -425,14 +422,20 @@ func searchOMDB(title, year string) ([]Program, error) {
 	defer resp.Body.Close()
 
 	var result struct {
-		Search []Program `json:"Search"`
+		Search []struct {
+			ImdbID string `json:"imdbID"`
+		} `json:"Search"`
 	}
-
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	return result.Search, nil
+	var IMDBIDs []string
+	for _, item := range result.Search {
+		IMDBIDs = append(IMDBIDs, item.ImdbID)
+	}
+
+	return IMDBIDs, nil
 }
 
 func getProgramInfo(imdbID string) (Program, error) {
@@ -473,9 +476,8 @@ func maybeUpdateDetails(m model) (model, tea.Cmd) {
 		} else {
 			imdbID = m.episodeRows[m.table.Cursor()].IMDBID
 		}
-		if details, ok := m.detailsCache[imdbID]; ok {
-			m.details = details
-			m.infoViewport.SetContent(details)
+		if program, ok := m.programCache[imdbID]; ok {
+			m.infoViewport.SetContent(buildDetails(program))
 			return m, nil
 		}
 		return m, fetchDetailsCmd(imdbID)
@@ -485,31 +487,20 @@ func maybeUpdateDetails(m model) (model, tea.Cmd) {
 
 func fetchDetailsCmd(imdbID string) tea.Cmd {
 	return func() tea.Msg {
-		details, err := getDetails(imdbID)
-		return detailsMsg{details: details, err: err, imdbID: imdbID}
+		program, err := getProgramInfo(imdbID)
+		return detailsMsg{details: program, err: err, imdbID: imdbID}
 	}
 }
 
-func getDetails(imdbID string) (string, error) {
-	url := fmt.Sprintf("https://www.omdbapi.com/?i=%s&apikey=%s", imdbID, apiKey)
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	var detailsObj Program
-	if err := json.NewDecoder(resp.Body).Decode(&detailsObj); err != nil {
-		return "", err
-	}
-	details := fmt.Sprintf(
+func buildDetails(program Program) string {
+	return fmt.Sprintf(
 		"Title: %s\nYear: %s\nRated: %s\nGenre: %s\nDirector: %s\nPlot: %s\nAwards: %s",
-		detailsObj.Title,
-		detailsObj.Year,
-		detailsObj.Rating,
-		detailsObj.Genre,
-		detailsObj.Director,
-		detailsObj.Plot,
-		detailsObj.Awards,
+		program.Title,
+		program.Year,
+		program.Rating,
+		program.Genre,
+		program.Director,
+		program.Plot,
+		program.Awards,
 	)
-	return details, nil
 }
