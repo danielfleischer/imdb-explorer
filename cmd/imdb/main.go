@@ -16,6 +16,8 @@ import (
 	"runtime"
 	"strconv"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
@@ -89,6 +91,7 @@ type model struct {
 	showDetails     bool
 	programCache    map[string]Program
 	newQueryInput   textinput.Model
+	spinner         spinner.Model
 }
 
 func (m model) Init() tea.Cmd {
@@ -96,14 +99,37 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case searchResultsMsg:
+		if msg.err != nil {
+			fmt.Println("Error searching:", msg.err)
+			return m, tea.Quit
+		}
+		m.programs = msg.programs
+		m.table = builtShowsTable(msg.programs)
+		m.state = ""
+		return m, nil
+	case detailsMsg:
+		m.programCache[msg.imdbID] = msg.details
+		m.infoViewport.SetContent(buildDetails(msg.details))
+		return m, nil
+	}
 	if m.state == "newQuery" {
 		var cmd tea.Cmd
 		m.newQueryInput, cmd = m.newQueryInput.Update(msg)
 		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
 			query := m.newQueryInput.Value()
-			m.state = ""
-			return m, newSearchCmd(query)
+			m.state = "loading"
+			s := spinner.New()
+			s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
+			m.spinner = s
+			return m, tea.Batch(newSearchCmd(query), m.spinner.Tick)
 		}
+		return m, cmd
+	}
+	if m.state == "loading" {
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	}
 	switch msg := msg.(type) {
@@ -282,6 +308,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	if m.state == "newQuery" {
 		return m.newQueryInput.View() + "\n\nPress enter to search."
+	}
+	if m.state == "loading" {
+		return "Searching... " + m.spinner.View()
 	}
 	view := ""
 	view += m.table.View() + hintColor("\n\nRET: browse | r: reviews | TAB: toggle details | up/down/n/p: move | b: back | q: quit")
