@@ -3,9 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/cases"
@@ -15,9 +18,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/lipgloss"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
@@ -46,9 +46,10 @@ type Program struct {
 	Plot     string `json:"Plot"`
 	Awards   string `json:"Awards"`
 }
-func newSearchCmd(query string) tea.Cmd {
+
+func newSearchCmd(query string, year string) tea.Cmd {
 	return func() tea.Msg {
-		imdbIDs, err := searchOMDB(query, "")
+		imdbIDs, err := searchOMDB(query, year)
 		if err != nil {
 			return searchResultsMsg{err: err}
 		}
@@ -92,17 +93,21 @@ type model struct {
 	programCache    map[string]Program
 	newQueryInput   textinput.Model
 	spinner         spinner.Model
+	query           string
+	year            string
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	s := spinner.New()
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
+	m.spinner = s
+	return tea.Batch(newSearchCmd(m.query, m.year), m.spinner.Tick)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case searchResultsMsg:
 		if msg.err != nil {
-			fmt.Println("Error searching:", msg.err)
 			return m, tea.Quit
 		}
 		m.programs = msg.programs
@@ -123,14 +128,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s := spinner.New()
 			s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
 			m.spinner = s
-			return m, tea.Batch(newSearchCmd(query), m.spinner.Tick)
+			return m, tea.Batch(newSearchCmd(query, m.year), m.spinner.Tick)
 		}
 		return m, cmd
 	}
 	if m.state == "loading" {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+		return m, tea.Batch(cmd, m.spinner.Tick)
 	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -288,19 +293,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-	case detailsMsg:
-		m.programCache[msg.imdbID] = msg.details
-		m.infoViewport.SetContent(buildDetails(msg.details))
-		return m, nil
-	case searchResultsMsg:
-		if msg.err != nil {
-			fmt.Println("Error searching:", msg.err)
-			return m, tea.Quit
-		}
-		m.programs = msg.programs
-		m.table = builtShowsTable(msg.programs)
-		m.state = ""
-		return m, nil
 	}
 	return m, nil
 }
@@ -313,7 +305,7 @@ func (m model) View() string {
 		return "Searching... " + m.spinner.View()
 	}
 	view := ""
-	view += m.table.View() + hintColor("\n\nRET: browse | r: reviews | TAB: toggle details | up/down/n/p: move | b: back | q: quit")
+	view += m.table.View() + hintColor("\n\nRET: browse | r: reviews | TAB: toggle details | up/down/n/p: move | b: back | s: new query | q: quit")
 	if m.showDetails {
 		view += infoColor("\n================ DETAILS =================\n\n")
 		view += infoColor(m.infoViewport.View() + "\n")
@@ -326,9 +318,9 @@ func main() {
 	var year string
 
 	var rootCmd = &cobra.Command{
-		Use:   "imdb [movie title]",
-		Short: "CLI app to search movies on OMDB",
-		Args:  cobra.MinimumNArgs(1),
+		Use:     "imdb [movie title]",
+		Short:   "CLI app to search movies on OMDB",
+		Args:    cobra.MinimumNArgs(1),
 		Version: Version,
 		Run: func(cmd *cobra.Command, args []string) {
 			title := args[0]
@@ -337,32 +329,18 @@ func main() {
 				return
 			}
 
-			IMDBIDs, err := searchOMDB(title, year)
-			if err != nil {
-				fmt.Println("Error:", err)
-				return
+			s := spinner.New()
+			s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("36"))
+			
+			m := model{
+				table:        builtShowsTable([]Program{}),
+				programs:     []Program{},
+				programCache: make(map[string]Program),
+				query:        title,
+				year:         year,
+				state:        "loading",
+				spinner:      s,
 			}
-
-			var programs []Program
-			for _, id := range IMDBIDs {
-				program, err := getProgramInfo(id)
-				if err != nil {
-					fmt.Println("Error:", err)
-					return
-				}
-				programs = append(programs, program)
-			}
-
-			var t table.Model
-			t = builtShowsTable(programs)
-
-			m := model{table: t, programs: programs, programCache: func() map[string]Program {
-				cache := make(map[string]Program)
-				for _, program := range programs {
-					cache[program.IMDBID] = program
-				}
-				return cache
-			}()}
 
 			p := tea.NewProgram(m)
 			if _, err := p.Run(); err != nil {
@@ -461,7 +439,7 @@ func openBrowser(url string) {
 	}
 }
 
-func searchOMDB(title, year string) ([]string, error) {
+func searchOMDB(title string, year string) ([]string, error) {
 	url := fmt.Sprintf("https://www.omdbapi.com/?s=%s&y=%s&apikey=%s", title, year, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
