@@ -1,4 +1,4 @@
-module cli
+module github.com/danielfleischer/imdb-explorer
 
 go 1.24.1
 
