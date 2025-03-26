@@ -1,4 +1,6 @@
 # IMDB Explorer
+[![Go Reference](https://pkg.go.dev/badge/github.com/danielfleischer/imdb-explorer.svg)](https://pkg.go.dev/github.com/danielfleischer/imdb-explorer)
+![GitHub Tag](https://img.shields.io/github/v/tag/danielfleischer/imdb-explorer)
 
 A simple CLI application to search movies and shows using the OMDB API.
 
