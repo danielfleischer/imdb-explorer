@@ -1,6 +1,9 @@
 # IMDB Explorer
+![GitHub Tag](https://img.shields.io/github/v/tag/danielfleischer/imdb-explorer?color=orange)
+[![License](https://img.shields.io/badge/License-Apache%202.0-red.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Reference](https://pkg.go.dev/badge/github.com/danielfleischer/imdb-explorer.svg)](https://pkg.go.dev/github.com/danielfleischer/imdb-explorer)
-![GitHub Tag](https://img.shields.io/github/v/tag/danielfleischer/imdb-explorer)
+[![Go Report Card](https://goreportcard.com/badge/github.com/danielfleischer/imdb-explorer)](https://goreportcard.com/report/github.com/danielfleischer/imdb-explorer)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/danielfleischer/imdb-explorer?color=00ADD8)](https://golang.org/)
 
 A simple CLI application to search movies and shows using the OMDB API.
 
