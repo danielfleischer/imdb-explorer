@@ -14,10 +14,12 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 )
 
 var apiKey = os.Getenv("OMDB_API_KEY")
@@ -319,12 +321,12 @@ func main() {
 	var year string
 
 	var rootCmd = &cobra.Command{
-		Use:     "imdb [movie title]",
-		Short:   "CLI app to search movies on OMDB",
+		Use:     "imdb [movie/show title]",
+		Short:   "CLI app to search movies or shows on IMDB",
 		Args:    cobra.MinimumNArgs(1),
 		Version: Version,
 		Run: func(cmd *cobra.Command, args []string) {
-			title := args[0]
+			title := strings.Join(args, " ")
 			if apiKey == "" {
 				fmt.Println("Error: OMDB_API_KEY environment variable is not set.")
 				return
@@ -441,7 +443,8 @@ func openBrowser(url string) {
 }
 
 func searchOMDB(title string, year string) ([]string, error) {
-	url := fmt.Sprintf("https://www.omdbapi.com/?s=%s&y=%s&apikey=%s", title, year, apiKey)
+	encodedTitle := url.QueryEscape(title)
+	url := fmt.Sprintf("https://www.omdbapi.com/?s=%s&y=%s&apikey=%s", encodedTitle, year, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
